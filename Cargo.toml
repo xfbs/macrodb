@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Patrick Elsen <pelsen@xfbs.net>"]
 description = "Macro-generated in-memory databased for Rust"
+license = "MIT"
 
 [dependencies]
 paste = "1.0.11"

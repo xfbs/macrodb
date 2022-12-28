@@ -1,5 +1,5 @@
 #![macro_use]
-use paste::paste;
+pub use paste::paste;
 
 #[cfg(test)]
 mod tests;
