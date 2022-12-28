@@ -2,6 +2,10 @@
 
 This is a crate that lets you automatically generate code for an in-memory database in Rust. It supports indexes, including unique indexes, as well as foreign keys. It can use [HashMap](https://doc.rust-lang.org/std/collections/hash_map/struct.HashMap.html) as well as [BTreeMap](https://doc.rust-lang.org/std/collections/struct.BTreeMap.html) for the indices.
 
+On a high level, the crate works by having you define a database struct that contains the tables and all of the indices, and then invoking the macro to generate appropriate insertion, update and deletion methods.
+
+There is no support for transactions, concurrency (aside from the usual Rust semantics of having either multiple readers or a single writer) or persistence.
+
 ## Benchmarks
 
 The speed of the generated database depends on the data type that you select (BTreeMap or HashMap) and on the number of indices. The repository contains a synthetic benchmark that performs tests on a table with two indices and one unique index. On a MacBook Air M2, it can perform more than a million insertions per second.

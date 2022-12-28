@@ -5,6 +5,10 @@ edition = "2021"
 authors = ["Patrick Elsen <pelsen@xfbs.net>"]
 description = "Macro-generated in-memory databased for Rust"
 license = "MIT"
+readme = "README.md"
+repository = "https://github.com/xfbs/macrodb"
+keywords = ["in-memory", "database", "relational"]
+categories = ["database-implementations", "data-structures"]
 
 [[bench]]
 name = "single_table"
