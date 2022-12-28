@@ -6,5 +6,12 @@ authors = ["Patrick Elsen <pelsen@xfbs.net>"]
 description = "Macro-generated in-memory databased for Rust"
 license = "MIT"
 
+[[bench]]
+name = "single_table"
+harness = false
+
 [dependencies]
 paste = "1.0.11"
+
+[dev-dependencies]
+criterion = "0.4.0"

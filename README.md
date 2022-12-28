@@ -2,6 +2,21 @@
 
 This is a crate that lets you automatically generate code for an in-memory database in Rust. It supports indexes, including unique indexes, as well as foreign keys. It can use [HashMap](https://doc.rust-lang.org/std/collections/hash_map/struct.HashMap.html) as well as [BTreeMap](https://doc.rust-lang.org/std/collections/struct.BTreeMap.html) for the indices.
 
+## Benchmarks
+
+The speed of the generated database depends on the data type that you select (BTreeMap or HashMap) and on the number of indices. The repository contains a synthetic benchmark that performs tests on a table with two indices and one unique index. On a MacBook Air M2, it can perform more than a million insertions per second.
+
+| Data types | Operations | Count | Time (ms) | Throughput (Melem/s) |
+| --- | --- | --: | --: | --: |
+| BTreeMap, BTreeSet | Insert | 1,000,000 | 564.26 | 1.7722 |
+| BTreeMap, BTreeSet | Update | 1,000,000 | 1,033.50 | 0.9676 |
+| BTreeMap, BTreeSet | Delete | 1,000,000 | 352.04 | 2.8406 |
+| HashMap, HashSet | Insert | 1,000,000 | 807.63 | 1.2382 |
+| HashMap, HashSet | Update | 1,000,000 | 1,319.20 | 0.7580 |
+| HashMap, HashSet | Delete | 1,000,000 | 789.22 | 1.2528 |
+
+This benchmark can be recreated by setting the insertion, update and deletion counts in `benches/single_table.rs` to one million and running `cargo bench`.
+
 ## Example
 
 See `examples/` in this repository.
