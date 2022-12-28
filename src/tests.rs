@@ -1,6 +1,7 @@
 use super::table;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
+/// Errors that can result from database operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum UserError {
     UserNotFound,
@@ -8,8 +9,10 @@ enum UserError {
     UserEmailExists,
 }
 
+/// Primary key of user records
 type UserId = u64;
 
+/// User record
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct User {
     id: UserId,
@@ -29,11 +32,17 @@ impl Default for User {
     }
 }
 
+/// User database
 #[derive(Default)]
 struct Users {
+    /// Stores User records
     users: BTreeMap<UserId, User>,
+    /// Users by email unique index
     user_by_email: BTreeMap<String, UserId>,
+    /// Users by age index
     users_by_age: HashMap<u32, HashSet<UserId>>,
+    /// Users by name index
+    users_by_name: BTreeMap<String, BTreeSet<UserId>>,
 }
 
 impl Users {
@@ -43,7 +52,8 @@ impl Users {
         missing UserError => UserError::UserNotFound,
         primary users id => UserError::UserIdExists,
         unique user_by_email email => UserError::UserEmailExists,
-        index users_by_age age => ()
+        index users_by_age age => (),
+        index users_by_name name => ()
     );
 }
 
@@ -56,6 +66,10 @@ fn can_insert_user() {
     assert_eq!(data.user_by_email.get(&user.email), Some(&user.id));
     assert_eq!(
         data.users_by_age.get(&user.age),
+        Some(&[user.id].into_iter().collect())
+    );
+    assert_eq!(
+        data.users_by_name.get(&user.name),
         Some(&[user.id].into_iter().collect())
     );
 }
@@ -104,6 +118,10 @@ fn can_insert_two_users() {
         data.users_by_age.get(&user1.age),
         Some(&[user1.id, user2.id].into_iter().collect())
     );
+    assert_eq!(
+        data.users_by_name.get(&user1.name),
+        Some(&[user1.id, user2.id].into_iter().collect())
+    );
 }
 
 #[test]
@@ -139,6 +157,11 @@ fn can_insert_three_users() {
         data.users_by_age.get(&user3.age),
         Some(&[user3.id].into_iter().collect())
     );
+
+    assert_eq!(
+        data.users_by_name.get(&user1.name),
+        Some(&[user1.id, user2.id, user3.id].into_iter().collect())
+    );
 }
 
 #[test]
@@ -156,6 +179,10 @@ fn can_update_user_email() {
     assert_eq!(data.user_by_email.get(&old.email), None);
     assert_eq!(
         data.users_by_age.get(&new.age),
+        Some(&[new.id].into_iter().collect())
+    );
+    assert_eq!(
+        data.users_by_name.get(&new.name),
         Some(&[new.id].into_iter().collect())
     );
 }
@@ -177,6 +204,27 @@ fn can_update_user_age() {
         data.users_by_age.get(&new.age),
         Some(&[new.id].into_iter().collect())
     );
+    assert_eq!(
+        data.users_by_name.get(&new.name),
+        Some(&[new.id].into_iter().collect())
+    );
+}
+
+#[test]
+fn can_update_user_name() {
+    let mut data = Users::default();
+    let old = User::default();
+    data.users_insert(old.clone()).unwrap();
+    let mut new = old.clone();
+    new.name = "other".into();
+    let result = data.users_update(new.clone()).unwrap();
+    assert_eq!(result, old);
+
+    assert_eq!(data.users_by_name.get(&old.name), None);
+    assert_eq!(
+        data.users_by_name.get(&new.name),
+        Some(&[new.id].into_iter().collect())
+    );
 }
 
 #[test]
@@ -187,6 +235,7 @@ fn can_update_user_all() {
     let mut new = old.clone();
     new.age = 30;
     new.email = "new@example.com".into();
+    new.name = "other".into();
     let result = data.users_update(new.clone()).unwrap();
     assert_eq!(result, old);
 
@@ -196,6 +245,11 @@ fn can_update_user_all() {
     assert_eq!(data.users_by_age.get(&old.age), None);
     assert_eq!(
         data.users_by_age.get(&new.age),
+        Some(&[new.id].into_iter().collect())
+    );
+    assert_eq!(data.users_by_name.get(&old.name), None);
+    assert_eq!(
+        data.users_by_name.get(&new.name),
         Some(&[new.id].into_iter().collect())
     );
 }
@@ -216,4 +270,63 @@ fn cannot_update_user_existing_email() {
     let result = data.users_update(user2_new.clone());
 
     assert_eq!(result, Err(UserError::UserEmailExists));
+}
+
+#[test]
+fn can_delete_user() {
+    let mut data = Users::default();
+    let user = User::default();
+    data.users_insert(user.clone()).unwrap();
+    data.users_delete(user.id).unwrap();
+    assert!(data.users.is_empty());
+    assert!(data.user_by_email.is_empty());
+    assert!(data.users_by_age.is_empty());
+    assert!(data.users_by_name.is_empty());
+}
+
+#[test]
+fn cannot_delete_user_missing() {
+    let mut data = Users::default();
+    let user = User::default();
+    data.users_insert(user.clone()).unwrap();
+    let result = data.users_delete(user.id + 1);
+    assert_eq!(result, Err(UserError::UserNotFound));
+}
+
+#[test]
+fn can_delete_two_users() {
+    let mut data = Users::default();
+    let user1 = User {
+        id: 0,
+        email: "user@example.com".into(),
+        age: 21,
+        ..User::default()
+    };
+    let user2 = User {
+        id: 1,
+        email: "other@example.com".into(),
+        age: 21,
+        ..User::default()
+    };
+    data.users_insert(user1.clone()).unwrap();
+    data.users_insert(user2.clone()).unwrap();
+    let result = data.users_delete(user1.id);
+    assert_eq!(result, Ok(user1.clone()));
+    assert_eq!(data.users.get(&user1.id), None);
+    assert_eq!(data.user_by_email.get(&user1.email), None);
+    assert_eq!(
+        data.users_by_age.get(&user2.age),
+        Some(&[user2.id].into_iter().collect())
+    );
+    assert_eq!(
+        data.users_by_name.get(&user2.name),
+        Some(&[user2.id].into_iter().collect())
+    );
+
+    let result = data.users_delete(user2.id);
+    assert_eq!(result, Ok(user2.clone()));
+    assert_eq!(data.users.get(&user2.id), None);
+    assert_eq!(data.user_by_email.get(&user2.email), None);
+    assert_eq!(data.users_by_age.get(&user2.age), None);
+    assert_eq!(data.users_by_name.get(&user2.name), None);
 }

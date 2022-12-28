@@ -68,13 +68,13 @@ macro_rules! table_insert_checks {
 
 #[macro_export]
 macro_rules! table_delete {
-    ($table:ident: $type:ty, $errty:ty) => {
+    ($table:ident: $type:ty, $pk:ty, $errty:ty) => {
         $crate::paste! {
-            pub fn [<$table _delete>](&mut self, id: $type) -> Result<(), $errty> {
+            pub fn [<$table _delete>](&mut self, id: $pk) -> Result<$type, $errty> {
                 let data = self.[<$table _delete_check>](id)?;
                 self.[<$table _delete_indices>](&data);
                 self.$table.remove(&id);
-                Ok(())
+                Ok(data)
             }
         }
     };
@@ -89,7 +89,7 @@ macro_rules! table_insert_index {
     };
     ($self:expr, $pk:expr, reverse, $name:ident, $prop:expr) => {};
     ($self:expr, $pk:expr, index, $name:ident, $prop:expr) => {
-        if !$self.$name.entry($prop).or_default().insert($pk) {
+        if !$self.$name.entry($prop.clone()).or_default().insert($pk) {
             panic!(concat!(stringify!($name), " index already had new user"));
         }
     };
@@ -289,7 +289,7 @@ macro_rules! table {
     ($table:ident: $type:ty, $pk:ident: $pkty:ty, missing $errty:ty => $missing:expr, $($itype:ident $name:ident $prop:ident => $err:expr),*) => {
         $crate::table_next_id!($table: $pkty);
         $crate::table_indices!($table: $type, $pk: $pkty, $errty, $missing, $($itype $name $prop => $err),*);
-        $crate::table_delete!($table: $pkty, $errty);
+        $crate::table_delete!($table: $type, $pkty, $errty);
         $crate::table_insert!($table: $type, $pk, $errty);
         $crate::table_update!($table: $type, $pk => $missing, $errty);
     }
