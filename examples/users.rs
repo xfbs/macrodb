@@ -24,6 +24,7 @@ pub enum Error {
     GroupNotFound,
     GroupIdExists,
     GroupNameExists,
+    GroupHasUsers,
 }
 
 #[derive(Default)]
@@ -42,6 +43,7 @@ impl Database {
         missing Error => Error::UserNotFound,
         primary users id => Error::UserIdExists,
         foreign groups group => Error::GroupNotFound,
+        index users_by_group group => (),
         unique user_by_name name => Error::UserNameExists
     );
     table!(
@@ -49,7 +51,8 @@ impl Database {
         id: GroupId,
         missing Error => Error::GroupNotFound,
         primary groups id => Error::GroupIdExists,
-        unique group_by_name name => Error::GroupNameExists
+        unique group_by_name name => Error::GroupNameExists,
+        reverse users_by_group id => Error::GroupHasUsers
     );
 }
 
