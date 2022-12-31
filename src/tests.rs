@@ -330,3 +330,21 @@ fn can_delete_two_users() {
     assert_eq!(data.users_by_age.get(&user2.age), None);
     assert_eq!(data.users_by_name.get(&user2.name), None);
 }
+
+#[test]
+fn can_get_next_id() {
+    let mut data = Users::default();
+    assert_eq!(data.users.contains_key(&data.users_next_id()), false);
+    data.users_insert(User::default()).unwrap();
+    assert_eq!(data.users.contains_key(&data.users_next_id()), false);
+    data.users_insert(User {
+        id: 1,
+        email: "other@example.com".into(),
+        ..Default::default()
+    }).unwrap();
+    assert_eq!(data.users.contains_key(&data.users_next_id()), false);
+    data.users_delete(0).unwrap();
+    assert_eq!(data.users.contains_key(&data.users_next_id()), false);
+    data.users_delete(1).unwrap();
+    assert_eq!(data.users.contains_key(&data.users_next_id()), false);
+}

@@ -57,5 +57,5 @@ impl Database {
 }
 
 fn main() {
-    let mut database = Database::default();
+    let database = Database::default();
 }
