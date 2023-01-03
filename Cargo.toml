@@ -18,4 +18,5 @@ harness = false
 paste = "1.0.11"
 
 [dev-dependencies]
+btree-slab = "0.5.1"
 criterion = "0.4.0"

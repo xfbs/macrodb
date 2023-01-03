@@ -341,7 +341,8 @@ fn can_get_next_id() {
         id: 1,
         email: "other@example.com".into(),
         ..Default::default()
-    }).unwrap();
+    })
+    .unwrap();
     assert_eq!(data.users.contains_key(&data.users_next_id()), false);
     data.users_delete(0).unwrap();
     assert_eq!(data.users.contains_key(&data.users_next_id()), false);
