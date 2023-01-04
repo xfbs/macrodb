@@ -303,8 +303,7 @@ macro_rules! table_delete_check {
             Some(items) if items.is_empty() => {
                 panic!(concat!(stringify!($name), " has empty index"))
             }
-            Some(items) if !items.is_empty() => return Err($err),
-            Some(items) => {}
+            Some(_items) => return Err($err),
         }
     };
     ($self:expr, $pk:expr, index, $name:ident, $prop:expr, $err:expr) => {};
