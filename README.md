@@ -10,7 +10,7 @@ There is no support for transactions, concurrency (aside from the usual Rust sem
 
 The speed of the generated database depends on the data type that you select (BTreeMap or HashMap) and on the number of indices. The repository contains a synthetic benchmark that performs tests on a table with two indices and one unique index. On a MacBook Air M2, it can perform more than a million insertions per second.
 
-| Data types | Operations | Count | Time (ms) | Throughput (Melem/s) |
+| Data types | Operations | Count | Time (ms) | Melem/s |
 | --- | --- | --: | --: | --: |
 | BTreeMap, BTreeSet | Insert | 1,000,000 | 564.26 | 1.772 |
 | BTreeMap, BTreeSet | Update | 1,000,000 | 1,033.50 | 0.967 |
