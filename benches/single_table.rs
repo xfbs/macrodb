@@ -1,5 +1,6 @@
 use btree_slab::{BTreeMap as BTreeSlabMap, BTreeSet as BTreeSlabSet};
 use criterion::*;
+use hashbrown::{HashMap as HashMapBrown, HashSet as HashSetBrown};
 use im::{HashMap as HashMapIm, OrdMap};
 use macrodb::table;
 use std::collections::{BTreeMap, BTreeSet};
@@ -133,6 +134,26 @@ impl HashImDatabase {
     );
 }
 
+#[derive(Default)]
+struct HashBrownDatabase {
+    users: HashMapBrown<UserId, User>,
+    user_by_email: HashMapBrown<String, UserId>,
+    users_by_age: HashMapBrown<u32, HashSetBrown<UserId>>,
+    users_by_name: HashMapBrown<String, HashSetBrown<UserId>>,
+}
+
+impl HashBrownDatabase {
+    table!(
+        users: User,
+        id: UserId,
+        missing Error => Error::UserNotFound,
+        primary users id => Error::UserIdExists,
+        unique user_by_email email => Error::UserEmailExists,
+        index users_by_age age => (),
+        index users_by_name name => ()
+    );
+}
+
 fn generate_users(limit: usize) -> Vec<User> {
     (0..limit)
         .map(|id| User {
@@ -249,6 +270,14 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         c,
         "im::hash",
         HashImDatabase,
+        insertions,
+        updates,
+        deletions
+    );
+    table_benchmark!(
+        c,
+        "brown::hash",
+        HashBrownDatabase,
         insertions,
         updates,
         deletions

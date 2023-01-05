@@ -12,12 +12,15 @@ The speed of the generated database depends on the data type that you select (BT
 
 | Data types | Operations | Count | Time (ms) | Throughput (Melem/s) |
 | --- | --- | --: | --: | --: |
-| BTreeMap, BTreeSet | Insert | 1,000,000 | 564.26 | 1.7722 |
-| BTreeMap, BTreeSet | Update | 1,000,000 | 1,033.50 | 0.9676 |
-| BTreeMap, BTreeSet | Delete | 1,000,000 | 352.04 | 2.8406 |
-| HashMap, HashSet | Insert | 1,000,000 | 807.63 | 1.2382 |
-| HashMap, HashSet | Update | 1,000,000 | 1,319.20 | 0.7580 |
-| HashMap, HashSet | Delete | 1,000,000 | 789.22 | 1.2528 |
+| BTreeMap, BTreeSet | Insert | 1,000,000 | 564.26 | 1.772 |
+| BTreeMap, BTreeSet | Update | 1,000,000 | 1,033.50 | 0.967 |
+| BTreeMap, BTreeSet | Delete | 1,000,000 | 352.04 | 2.840 |
+| HashMap, HashSet | Insert | 1,000,000 | 807.63 | 1.238 |
+| HashMap, HashSet | Update | 1,000,000 | 1,319.20 | 0.758 |
+| HashMap, HashSet | Delete | 1,000,000 | 789.22 | 1.252 |
+| hashbrown HashMap, HashSet | Insert | 1,000,000 | 485.43 | 2.060 |
+| hashbrown HashMap, HashSet | Update | 1,000,000 | 981.00 | 1.019 |
+| hashbrown HashMap, HashSet | Delete | 1,000,000 | 616.93 | 1.620 |
 
 This benchmark can be recreated by setting the insertion, update and deletion counts in `benches/single_table.rs` to one million and running `cargo bench`.
 
