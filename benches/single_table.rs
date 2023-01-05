@@ -1,3 +1,4 @@
+use avl::{AvlTreeMap, AvlTreeSet};
 use btree_slab::{BTreeMap as BTreeSlabMap, BTreeSet as BTreeSlabSet};
 use criterion::*;
 use hashbrown::{HashMap as HashMapBrown, HashSet as HashSetBrown};
@@ -154,6 +155,26 @@ impl HashBrownDatabase {
     );
 }
 
+#[derive(Default)]
+struct AvlDatabase {
+    users: AvlTreeMap<UserId, User>,
+    user_by_email: AvlTreeMap<String, UserId>,
+    users_by_age: AvlTreeMap<u32, AvlTreeSet<UserId>>,
+    users_by_name: AvlTreeMap<String, AvlTreeSet<UserId>>,
+}
+
+impl AvlDatabase {
+    table!(
+        users: User,
+        id: UserId,
+        missing Error => Error::UserNotFound,
+        primary users id => Error::UserIdExists,
+        unique user_by_email email => Error::UserEmailExists,
+        index users_by_age age => (),
+        index users_by_name name => ()
+    );
+}
+
 fn generate_users(limit: usize) -> Vec<User> {
     (0..limit)
         .map(|id| User {
@@ -282,6 +303,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         updates,
         deletions
     );
+    table_benchmark!(c, "avl::tree", AvlDatabase, insertions, updates, deletions);
 }
 
 criterion_group!(benches, criterion_benchmark);
