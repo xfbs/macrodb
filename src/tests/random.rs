@@ -282,20 +282,23 @@ fn can_issue_random_operations() {
     let mut database = Database::default();
     let mut errors: BTreeMap<Error, usize> = BTreeMap::new();
     let mut successes = 0;
-    for i in 0..10_000 {
-        let operation = Operation::random(&mut rng);
-        match operation.apply(&mut database) {
-            Ok(()) => {
-                successes += 1;
-            }
-            Err(err) => {
-                *errors.entry(err).or_default() += 1;
+    let batch_size = 100;
+    for i in (0..100_00).step_by(batch_size) {
+        let mut operations: Vec<Operation> = (0..batch_size)
+            .map(|_| Operation::random(&mut rng))
+            .collect();
+        for operation in operations.into_iter() {
+            match operation.apply(&mut database) {
+                Ok(()) => {
+                    successes += 1;
+                }
+                Err(err) => {
+                    *errors.entry(err).or_default() += 1;
+                }
             }
         }
 
-        if i % 100 == 0 {
-            check(&database);
-        }
+        check(&database);
     }
     assert!(successes > 0);
     for error in Error::iter() {
