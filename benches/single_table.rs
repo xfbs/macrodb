@@ -179,12 +179,12 @@ impl AvlDatabase {
     );
 }
 
-fn generate_user(id: u64) -> User {
+fn generate_user(id: u64, num: u64) -> User {
     User {
-        id: id as u64,
-        email: format!("user-{id}@example.com"),
-        name: format!("user-{id}"),
-        age: 21 + (id % 50) as u32,
+        id: id,
+        email: format!("user-{num}@example.com"),
+        name: format!("user-{num}"),
+        age: 21 + (num % 50) as u32,
     }
 }
 
@@ -196,16 +196,23 @@ fn random_range(limit: u64) -> Vec<u64> {
 }
 
 fn generate_users_random(limit: u64) -> Vec<User> {
-    random_range(limit).into_iter().map(generate_user).collect()
+    random_range(limit)
+        .into_iter()
+        .enumerate()
+        .map(|(id, num)| generate_user(id as u64, num))
+        .collect()
 }
 
 fn generate_users(limit: u64) -> Vec<User> {
-    (0..limit).map(generate_user).collect::<Vec<User>>()
+    (0..limit)
+        .map(|num| generate_user(num, num))
+        .collect::<Vec<User>>()
 }
 
 macro_rules! table_benchmark {
     ($c:expr, $name:expr, $database:ty, $operations:expr) => {
         let mut group = $c.benchmark_group($name);
+
         for insertions in $operations.into_iter() {
             group.throughput(Throughput::Elements(insertions));
             group.bench_with_input(format!("insert-{insertions}"), &insertions, |b, elems| {
@@ -222,6 +229,7 @@ macro_rules! table_benchmark {
                 )
             });
         }
+
         for insertions in $operations.into_iter() {
             group.throughput(Throughput::Elements(insertions));
             group.bench_with_input(
@@ -242,6 +250,7 @@ macro_rules! table_benchmark {
                 },
             );
         }
+
         for updates in $operations.into_iter() {
             group.throughput(Throughput::Elements(updates));
             group.bench_with_input(format!("update-{updates}"), &updates, |b, elems| {
@@ -268,6 +277,35 @@ macro_rules! table_benchmark {
                 )
             });
         }
+
+        for updates in $operations.into_iter() {
+            group.throughput(Throughput::Elements(updates));
+            group.bench_with_input(format!("random-update-{updates}"), &updates, |b, elems| {
+                b.iter_batched(
+                    || {
+                        let users = generate_users(*elems);
+                        let mut database = <$database>::default();
+                        for user in users.into_iter() {
+                            database.users_insert(user).unwrap();
+                        }
+                        let order = random_range(*elems);
+                        (database, order)
+                    },
+                    |(mut database, order)| {
+                        for id in order.into_iter() {
+                            let mut user = database.users.get(&id).unwrap().clone();
+                            user.age = 18 + (id % 53) as u32;
+                            user.name = format!("new-{id}");
+                            user.email = format!("new-{id}@example.com");
+                            database.users_update(user).unwrap();
+                        }
+                        black_box(database)
+                    },
+                    BatchSize::SmallInput,
+                )
+            });
+        }
+
         for deletions in $operations.into_iter() {
             group.throughput(Throughput::Elements(deletions));
             group.bench_with_input(format!("delete-{deletions}"), &deletions, |b, elems| {
@@ -290,6 +328,7 @@ macro_rules! table_benchmark {
                 )
             });
         }
+
         group.finish();
     };
 }
