@@ -398,10 +398,12 @@ macro_rules! table_update {
 ///     UserIdExists,
 ///     UserEmailExists,
 ///     UserNotFound,
+///     UserNameEmpty,
 ///     GroupNameExists,
 ///     GroupIdExists,
 ///     GroupNotFound,
 ///     GroupNotEmpty,
+///     GroupNameEmpty,
 /// }
 /// ```
 ///
@@ -493,6 +495,7 @@ macro_rules! table_update {
 ///     $id_field: RowId,
 ///     missing ErrorType => $missing_error,
 ///     primary $table_name $id_field => $exists_error,
+///     <constraints...>
 ///     <indices...>
 /// );
 /// ```
@@ -508,7 +511,43 @@ macro_rules! table_update {
 /// | `ErrorType` | `Error` | Name of the error type (enum) |
 /// | `$missing_error` | `Error::UserNotFound` | Error to throw when trying to delete a row that does not exists |
 /// | `$exists_error` | `Error::UserIdExists` | Error to throw when trying to insert a row that already exists |
+/// | `<constraints...>` | Definitions for the constraints (if any). |
 /// | `<indices...>` | | Definitions for the indices (explained in next section) |
+///
+/// ### Constraints
+///
+/// The syntax for constraints is the following:
+///
+/// ```rust,ignore
+/// constraint fn_name _ => (),
+/// ```
+///
+/// In order to define constraints, you need to declare a method on your database struct. This
+/// method should return `Result<(), ErrorType>`. For example, you can create a constraint that
+/// enforces that a user name should not be empty. The constraint method might look like this:
+///
+/// ```rust
+/// # enum Error { UserNameEmpty, }
+/// # struct User { name: String }
+/// # struct Database {}
+/// impl Database {
+///     fn name_not_empty(&self, user: &User) -> Result<(), Error> {
+///         if user.name.is_empty() {
+///             return Err(Error::UserNameEmpty);
+///         }
+///
+///         Ok(())
+///     }
+/// }
+/// ```
+///
+/// Defining the constraint in the macro then looks as follows:
+///
+/// ```text
+/// constraint name_not_empty _ => ()
+/// ```
+///
+/// ### Indices
 ///
 /// The macro also needs to be told of the various indices. The syntax for indices looks like
 /// this:
@@ -561,10 +600,12 @@ macro_rules! table_update {
 /// #     UserIdExists,
 /// #     UserEmailExists,
 /// #     UserNotFound,
+/// #     UserNameEmpty,
 /// #     GroupNameExists,
 /// #     GroupIdExists,
 /// #     GroupNotFound,
 /// #     GroupNotEmpty,
+/// #     GroupNameEmpty,
 /// # }
 /// # type UserId = u64;
 /// # #[derive(Clone)]
@@ -588,6 +629,22 @@ macro_rules! table_update {
 /// #     group_by_name: BTreeMap<String, GroupId>,
 /// # }
 /// impl Database {
+///     fn user_name_not_empty(&self, user: &User) -> Result<(), Error> {
+///         if user.name.is_empty() {
+///             return Err(Error::UserNameEmpty);
+///         }
+///
+///         Ok(())
+///     }
+///
+///     fn group_name_not_empty(&self, group: &Group) -> Result<(), Error> {
+///         if group.name.is_empty() {
+///             return Err(Error::GroupNameEmpty);
+///         }
+///
+///         Ok(())
+///     }
+///
 ///     table!(
 ///         users: User,
 ///         id: UserId,
@@ -595,6 +652,7 @@ macro_rules! table_update {
 ///         primary users id => Error::UserIdExists,
 ///         foreign groups group => Error::GroupNotFound,
 ///         index users_by_group group => (),
+///         constraint user_name_not_empty _ => (),
 ///         unique user_by_email email => Error::UserEmailExists
 ///     );
 ///     table!(
@@ -602,6 +660,7 @@ macro_rules! table_update {
 ///         id: GroupId,
 ///         missing Error => Error::GroupNotFound,
 ///         primary users id => Error::GroupIdExists,
+///         constraint group_name_not_empty _ => (),
 ///         reverse users_by_group id => Error::GroupNotEmpty,
 ///         unique group_by_name name => Error::GroupNameExists
 ///     );
