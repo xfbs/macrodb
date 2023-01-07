@@ -558,7 +558,8 @@ macro_rules! table_update {
 ///
 /// Here, `$type` refers to the type of index (can be `index`, `unique`, `foreign` or
 /// `reverse`). `$map` is the name of the map field in the database struct that represents this
-/// index. `$field` is the name of the field of the `RowType` that this index is on. Finally,
+/// index. `$field` is the name of the field of the `RowType` that this index is on. The field can
+/// also be a compound key, by writing it as a tuple (for example `(first_name, last_name)`. Finally,
 /// `$error` is the error that is thrown when this index is violated. Here is an overview of the
 /// index types:
 ///
