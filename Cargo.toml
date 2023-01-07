@@ -25,4 +25,5 @@ hashbrown = "0.13.1"
 im = "15.1.0"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
+rusqlite = "0.28.0"
 strum = { version = "0.24.1", features = ["derive"] }

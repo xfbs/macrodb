@@ -6,10 +6,23 @@ use im::{HashMap as HashMapIm, OrdMap};
 use macrodb::table;
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_chacha::ChaCha20Rng;
-use std::collections::{BTreeMap, BTreeSet};
-use std::collections::{HashMap, HashSet};
+use rusqlite::Connection;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::time::Duration;
 
 const RANDOM_SEED: u64 = 12345;
+const SQLITE_SCHEMA: &'static str = "
+CREATE TABLE users(
+    id INTEGER NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    age INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX user_by_email ON users(email);
+CREATE INDEX users_by_name ON users(name);
+CREATE INDEX users_by_age ON users(age);
+";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Error {
@@ -212,6 +225,8 @@ fn generate_users(limit: u64) -> Vec<User> {
 macro_rules! table_benchmark {
     ($c:expr, $name:expr, $database:ty, $operations:expr) => {
         let mut group = $c.benchmark_group($name);
+        group.sample_size(10);
+        group.measurement_time(Duration::from_secs(10));
         for ops in $operations.into_iter() {
             group.throughput(Throughput::Elements(ops));
 
@@ -229,7 +244,6 @@ macro_rules! table_benchmark {
                 )
             });
 
-            group.throughput(Throughput::Elements(ops));
             group.bench_with_input(format!("random-insert-{ops}"), &ops, |b, elems| {
                 b.iter_batched(
                     || generate_users_random(*elems),
@@ -244,7 +258,6 @@ macro_rules! table_benchmark {
                 )
             });
 
-            group.throughput(Throughput::Elements(ops));
             group.bench_with_input(format!("update-{ops}"), &ops, |b, elems| {
                 b.iter_batched(
                     || {
@@ -269,7 +282,6 @@ macro_rules! table_benchmark {
                 )
             });
 
-            group.throughput(Throughput::Elements(ops));
             group.bench_with_input(format!("random-update-{ops}"), &ops, |b, elems| {
                 b.iter_batched(
                     || {
@@ -295,7 +307,6 @@ macro_rules! table_benchmark {
                 )
             });
 
-            group.throughput(Throughput::Elements(ops));
             group.bench_with_input(format!("clone-{ops}"), &ops, |b, elems| {
                 b.iter_batched(
                     || {
@@ -311,7 +322,6 @@ macro_rules! table_benchmark {
                 )
             });
 
-            group.throughput(Throughput::Elements(ops));
             group.bench_with_input(format!("delete-{ops}"), &ops, |b, elems| {
                 b.iter_batched(
                     || {
@@ -332,7 +342,6 @@ macro_rules! table_benchmark {
                 )
             });
 
-            group.throughput(Throughput::Elements(ops));
             group.bench_with_input(format!("random-delete-{ops}"), &ops, |b, elems| {
                 b.iter_batched(
                     || {
@@ -359,6 +368,248 @@ macro_rules! table_benchmark {
     };
 }
 
+macro_rules! sqlite_benchmark {
+    ($c:expr, $name:expr, $operations:expr) => {
+        let mut group = $c.benchmark_group($name);
+        group.sample_size(10);
+        group.measurement_time(Duration::from_secs(10));
+
+        for ops in $operations.into_iter() {
+            group.throughput(Throughput::Elements(ops));
+
+            group.bench_with_input(format!("insert-{ops}"), &ops, |b, elems| {
+                b.iter_batched(
+                    || {
+                        let users = generate_users(*elems);
+                        let database = Connection::open_in_memory().unwrap();
+                        database.execute_batch(SQLITE_SCHEMA).unwrap();
+                        (database, users)
+                    },
+                    |(mut database, users)| {
+                        let transaction = database.transaction().unwrap();
+                        let mut insertion = transaction
+                            .prepare("INSERT INTO users(id, name, email, age) VALUES (?, ?, ?, ?)")
+                            .unwrap();
+                        for user in users.into_iter() {
+                            insertion
+                                .execute((user.id, &user.name, &user.email, user.age))
+                                .unwrap();
+                        }
+                        drop(insertion);
+                        transaction.commit().unwrap();
+                        black_box(database)
+                    },
+                    BatchSize::SmallInput,
+                )
+            });
+
+            group.bench_with_input(format!("random-insert-{ops}"), &ops, |b, elems| {
+                b.iter_batched(
+                    || {
+                        let users = generate_users_random(*elems);
+                        let database = Connection::open_in_memory().unwrap();
+                        database.execute_batch(SQLITE_SCHEMA).unwrap();
+                        (database, users)
+                    },
+                    |(mut database, users)| {
+                        let transaction = database.transaction().unwrap();
+                        let mut insertion = transaction
+                            .prepare("INSERT INTO users(id, name, email, age) VALUES (?, ?, ?, ?)")
+                            .unwrap();
+                        for user in users.into_iter() {
+                            insertion
+                                .execute((user.id, &user.name, &user.email, user.age))
+                                .unwrap();
+                        }
+                        drop(insertion);
+                        transaction.commit().unwrap();
+                        black_box(database)
+                    },
+                    BatchSize::SmallInput,
+                )
+            });
+
+            group.bench_with_input(format!("update-{ops}"), &ops, |b, elems| {
+                b.iter_batched(
+                    || {
+                        let users = generate_users(*elems);
+                        let mut database = Connection::open_in_memory().unwrap();
+                        database.execute_batch(SQLITE_SCHEMA).unwrap();
+                        let transaction = database.transaction().unwrap();
+                        let mut insertion = transaction
+                            .prepare("INSERT INTO users(id, name, email, age) VALUES (?, ?, ?, ?)")
+                            .unwrap();
+                        for user in users.into_iter() {
+                            insertion
+                                .execute((user.id, &user.name, &user.email, user.age))
+                                .unwrap();
+                        }
+                        drop(insertion);
+                        transaction.commit().unwrap();
+                        database
+                    },
+                    |mut database| {
+                        let transaction = database.transaction().unwrap();
+                        for id in 0..*elems {
+                            let mut lookup = transaction
+                                .prepare_cached("SELECT * FROM users WHERE id = ?")
+                                .unwrap();
+                            let mut result = lookup.query((id,)).unwrap();
+                            let row = result.next().unwrap().unwrap();
+                            let mut user = User {
+                                id: row.get(0).unwrap(),
+                                name: row.get(1).unwrap(),
+                                email: row.get(2).unwrap(),
+                                age: row.get(3).unwrap(),
+                            };
+                            user.age = 18 + (id % 53) as u32;
+                            user.name = format!("new-{id}");
+                            user.email = format!("new-{id}@example.com");
+                            let mut insertion = transaction
+                                .prepare_cached(
+                                    "UPDATE users SET name = ?, email = ?, age = ? WHERE id = ?",
+                                )
+                                .unwrap();
+                            insertion
+                                .execute((&user.name, &user.email, user.age, user.id))
+                                .unwrap();
+                        }
+                        transaction.commit().unwrap();
+                        black_box(database)
+                    },
+                    BatchSize::SmallInput,
+                )
+            });
+
+            group.bench_with_input(format!("random-update-{ops}"), &ops, |b, elems| {
+                b.iter_batched(
+                    || {
+                        let users = generate_users(*elems);
+                        let mut database = Connection::open_in_memory().unwrap();
+                        database.execute_batch(SQLITE_SCHEMA).unwrap();
+                        let transaction = database.transaction().unwrap();
+                        let mut insertion = transaction
+                            .prepare("INSERT INTO users(id, name, email, age) VALUES (?, ?, ?, ?)")
+                            .unwrap();
+                        for user in users.into_iter() {
+                            insertion
+                                .execute((user.id, &user.name, &user.email, user.age))
+                                .unwrap();
+                        }
+                        drop(insertion);
+                        transaction.commit().unwrap();
+                        let order = random_range(*elems);
+                        (database, order)
+                    },
+                    |(mut database, order)| {
+                        let transaction = database.transaction().unwrap();
+                        for id in order.into_iter() {
+                            let mut lookup = transaction
+                                .prepare_cached("SELECT * FROM users WHERE id = ?")
+                                .unwrap();
+                            let mut result = lookup.query((id,)).unwrap();
+                            let row = result.next().unwrap().unwrap();
+                            let mut user = User {
+                                id: row.get(0).unwrap(),
+                                name: row.get(1).unwrap(),
+                                email: row.get(2).unwrap(),
+                                age: row.get(3).unwrap(),
+                            };
+                            user.age = 18 + (id % 53) as u32;
+                            user.name = format!("new-{id}");
+                            user.email = format!("new-{id}@example.com");
+                            let mut insertion = transaction
+                                .prepare_cached(
+                                    "UPDATE users SET name = ?, email = ?, age = ? WHERE id = ?",
+                                )
+                                .unwrap();
+                            insertion
+                                .execute((&user.name, &user.email, user.age, user.id))
+                                .unwrap();
+                        }
+                        transaction.commit().unwrap();
+                        black_box(database)
+                    },
+                    BatchSize::SmallInput,
+                )
+            });
+
+            group.bench_with_input(format!("delete-{ops}"), &ops, |b, elems| {
+                b.iter_batched(
+                    || {
+                        let users = generate_users(*elems);
+                        let mut database = Connection::open_in_memory().unwrap();
+                        database.execute_batch(SQLITE_SCHEMA).unwrap();
+                        let transaction = database.transaction().unwrap();
+                        let mut insertion = transaction
+                            .prepare("INSERT INTO users(id, name, email, age) VALUES (?, ?, ?, ?)")
+                            .unwrap();
+                        for user in users.into_iter() {
+                            insertion
+                                .execute((user.id, &user.name, &user.email, user.age))
+                                .unwrap();
+                        }
+                        drop(insertion);
+                        transaction.commit().unwrap();
+                        database
+                    },
+                    |mut database| {
+                        let transaction = database.transaction().unwrap();
+                        let mut insertion = transaction
+                            .prepare("DELETE FROM users WHERE id = ?")
+                            .unwrap();
+                        for user in 0..*elems {
+                            insertion.execute((user as i64,)).unwrap();
+                        }
+                        drop(insertion);
+                        transaction.commit().unwrap();
+                        black_box(database)
+                    },
+                    BatchSize::SmallInput,
+                )
+            });
+
+            group.bench_with_input(format!("random-delete-{ops}"), &ops, |b, elems| {
+                b.iter_batched(
+                    || {
+                        let users = generate_users(*elems);
+                        let mut database = Connection::open_in_memory().unwrap();
+                        database.execute_batch(SQLITE_SCHEMA).unwrap();
+                        let transaction = database.transaction().unwrap();
+                        let mut insertion = transaction
+                            .prepare("INSERT INTO users(id, name, email, age) VALUES (?, ?, ?, ?)")
+                            .unwrap();
+                        for user in users.into_iter() {
+                            insertion
+                                .execute((user.id, &user.name, &user.email, user.age))
+                                .unwrap();
+                        }
+                        drop(insertion);
+                        transaction.commit().unwrap();
+                        let order = random_range(*elems);
+                        (database, order)
+                    },
+                    |(mut database, order)| {
+                        let transaction = database.transaction().unwrap();
+                        let mut insertion = transaction
+                            .prepare("DELETE FROM users WHERE id = ?")
+                            .unwrap();
+                        for user in order.into_iter() {
+                            insertion.execute((user as i64,)).unwrap();
+                        }
+                        drop(insertion);
+                        transaction.commit().unwrap();
+                        black_box(database)
+                    },
+                    BatchSize::SmallInput,
+                )
+            });
+        }
+
+        group.finish();
+    };
+}
+
 pub fn criterion_benchmark(c: &mut Criterion) {
     let operations = [100_000];
 
@@ -369,6 +620,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     table_benchmark!(c, "im::hash", HashImDatabase, operations);
     table_benchmark!(c, "brown::hash", HashBrownDatabase, operations);
     table_benchmark!(c, "avl::tree", AvlDatabase, operations);
+
+    sqlite_benchmark!(c, "sqlite", operations);
 }
 
 criterion_group!(benches, criterion_benchmark);
