@@ -39,7 +39,7 @@ impl Default for User {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct BTreeDatabase {
     users: BTreeMap<UserId, User>,
     user_by_email: BTreeMap<String, UserId>,
@@ -59,7 +59,7 @@ impl BTreeDatabase {
     );
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct BTreeSlabDatabase {
     users: BTreeSlabMap<UserId, User>,
     user_by_email: BTreeSlabMap<String, UserId>,
@@ -99,7 +99,7 @@ impl OrdMapDatabase {
     );
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct HashDatabase {
     users: HashMap<UserId, User>,
     user_by_email: HashMap<String, UserId>,
@@ -119,7 +119,7 @@ impl HashDatabase {
     );
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct HashImDatabase {
     users: HashMapIm<UserId, User>,
     user_by_email: HashMapIm<String, UserId>,
@@ -139,7 +139,7 @@ impl HashImDatabase {
     );
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct HashBrownDatabase {
     users: HashMapBrown<UserId, User>,
     user_by_email: HashMapBrown<String, UserId>,
@@ -159,7 +159,7 @@ impl HashBrownDatabase {
     );
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct AvlDatabase {
     users: AvlTreeMap<UserId, User>,
     user_by_email: AvlTreeMap<String, UserId>,
@@ -296,6 +296,22 @@ macro_rules! table_benchmark {
             });
 
             group.throughput(Throughput::Elements(ops));
+            group.bench_with_input(format!("clone-{ops}"), &ops, |b, elems| {
+                b.iter_batched(
+                    || {
+                        let users = generate_users(*elems);
+                        let mut database = <$database>::default();
+                        for user in users.into_iter() {
+                            database.users_insert(user).unwrap();
+                        }
+                        database
+                    },
+                    |database| black_box(database.clone()),
+                    BatchSize::SmallInput,
+                )
+            });
+
+            group.throughput(Throughput::Elements(ops));
             group.bench_with_input(format!("delete-{ops}"), &ops, |b, elems| {
                 b.iter_batched(
                     || {
@@ -308,6 +324,28 @@ macro_rules! table_benchmark {
                     },
                     |mut database| {
                         for id in 0..*elems {
+                            database.users_delete(id).unwrap();
+                        }
+                        black_box(database)
+                    },
+                    BatchSize::SmallInput,
+                )
+            });
+
+            group.throughput(Throughput::Elements(ops));
+            group.bench_with_input(format!("random-delete-{ops}"), &ops, |b, elems| {
+                b.iter_batched(
+                    || {
+                        let users = generate_users(*elems);
+                        let mut database = <$database>::default();
+                        for user in users.into_iter() {
+                            database.users_insert(user).unwrap();
+                        }
+                        let order = random_range(*elems);
+                        (database, order)
+                    },
+                    |(mut database, order)| {
+                        for id in order.into_iter() {
                             database.users_delete(id).unwrap();
                         }
                         black_box(database)
