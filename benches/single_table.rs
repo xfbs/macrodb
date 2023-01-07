@@ -4,8 +4,12 @@ use criterion::*;
 use hashbrown::{HashMap as HashMapBrown, HashSet as HashSetBrown};
 use im::{HashMap as HashMapIm, OrdMap};
 use macrodb::table;
+use rand::{seq::SliceRandom, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 use std::collections::{BTreeMap, BTreeSet};
 use std::collections::{HashMap, HashSet};
+
+const RANDOM_SEED: u64 = 12345;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Error {
@@ -175,25 +179,38 @@ impl AvlDatabase {
     );
 }
 
-fn generate_users(limit: usize) -> Vec<User> {
-    (0..limit)
-        .map(|id| User {
-            id: id as u64,
-            email: format!("user-{id}@example.com"),
-            name: format!("user-{id}"),
-            age: 21 + (id % 50) as u32,
-        })
-        .collect::<Vec<User>>()
+fn generate_user(id: u64) -> User {
+    User {
+        id: id as u64,
+        email: format!("user-{id}@example.com"),
+        name: format!("user-{id}"),
+        age: 21 + (id % 50) as u32,
+    }
+}
+
+fn random_range(limit: u64) -> Vec<u64> {
+    let mut rng = ChaCha20Rng::seed_from_u64(RANDOM_SEED);
+    let mut indices: Vec<u64> = (0..limit).collect();
+    indices.shuffle(&mut rng);
+    indices
+}
+
+fn generate_users_random(limit: u64) -> Vec<User> {
+    random_range(limit).into_iter().map(generate_user).collect()
+}
+
+fn generate_users(limit: u64) -> Vec<User> {
+    (0..limit).map(generate_user).collect::<Vec<User>>()
 }
 
 macro_rules! table_benchmark {
-    ($c:expr, $name:expr, $database:ty, $insertions:expr, $updates:expr, $deletions:expr) => {
+    ($c:expr, $name:expr, $database:ty, $operations:expr) => {
         let mut group = $c.benchmark_group($name);
-        for insertions in $insertions.into_iter() {
+        for insertions in $operations.into_iter() {
             group.throughput(Throughput::Elements(insertions));
             group.bench_with_input(format!("insert-{insertions}"), &insertions, |b, elems| {
                 b.iter_batched(
-                    || generate_users(*elems as usize),
+                    || generate_users(*elems),
                     |data| {
                         let mut database = <$database>::default();
                         for user in data.into_iter() {
@@ -205,12 +222,32 @@ macro_rules! table_benchmark {
                 )
             });
         }
-        for updates in $updates.into_iter() {
+        for insertions in $operations.into_iter() {
+            group.throughput(Throughput::Elements(insertions));
+            group.bench_with_input(
+                format!("random-insert-{insertions}"),
+                &insertions,
+                |b, elems| {
+                    b.iter_batched(
+                        || generate_users_random(*elems),
+                        |data| {
+                            let mut database = <$database>::default();
+                            for user in data.into_iter() {
+                                database.users_insert(user).unwrap();
+                            }
+                            black_box(database)
+                        },
+                        BatchSize::SmallInput,
+                    )
+                },
+            );
+        }
+        for updates in $operations.into_iter() {
             group.throughput(Throughput::Elements(updates));
             group.bench_with_input(format!("update-{updates}"), &updates, |b, elems| {
                 b.iter_batched(
                     || {
-                        let users = generate_users(*elems as usize);
+                        let users = generate_users(*elems);
                         let mut database = <$database>::default();
                         for user in users.into_iter() {
                             database.users_insert(user).unwrap();
@@ -231,12 +268,12 @@ macro_rules! table_benchmark {
                 )
             });
         }
-        for deletions in $deletions.into_iter() {
+        for deletions in $operations.into_iter() {
             group.throughput(Throughput::Elements(deletions));
             group.bench_with_input(format!("delete-{deletions}"), &deletions, |b, elems| {
                 b.iter_batched(
                     || {
-                        let users = generate_users(*elems as usize);
+                        let users = generate_users(*elems);
                         let mut database = <$database>::default();
                         for user in users.into_iter() {
                             database.users_insert(user).unwrap();
@@ -258,52 +295,15 @@ macro_rules! table_benchmark {
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let insertions = [100_000];
-    let deletions = [100_000];
-    let updates = [100_000];
+    let operations = [100_000];
 
-    table_benchmark!(
-        c,
-        "std::btree",
-        BTreeDatabase,
-        insertions,
-        updates,
-        deletions
-    );
-    table_benchmark!(c, "std::hash", HashDatabase, insertions, updates, deletions);
-    table_benchmark!(
-        c,
-        "slab::btree",
-        BTreeSlabDatabase,
-        insertions,
-        updates,
-        deletions
-    );
-    table_benchmark!(
-        c,
-        "im::btree",
-        OrdMapDatabase,
-        insertions,
-        updates,
-        deletions
-    );
-    table_benchmark!(
-        c,
-        "im::hash",
-        HashImDatabase,
-        insertions,
-        updates,
-        deletions
-    );
-    table_benchmark!(
-        c,
-        "brown::hash",
-        HashBrownDatabase,
-        insertions,
-        updates,
-        deletions
-    );
-    table_benchmark!(c, "avl::tree", AvlDatabase, insertions, updates, deletions);
+    table_benchmark!(c, "std::btree", BTreeDatabase, operations);
+    table_benchmark!(c, "std::hash", HashDatabase, operations);
+    table_benchmark!(c, "slab::btree", BTreeSlabDatabase, operations);
+    table_benchmark!(c, "im::btree", OrdMapDatabase, operations);
+    table_benchmark!(c, "im::hash", HashImDatabase, operations);
+    table_benchmark!(c, "brown::hash", HashBrownDatabase, operations);
+    table_benchmark!(c, "avl::tree", AvlDatabase, operations);
 }
 
 criterion_group!(benches, criterion_benchmark);
