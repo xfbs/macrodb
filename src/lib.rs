@@ -95,23 +95,27 @@ macro_rules! table_insert {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! table_insert_check {
-    ($self:expr, foreign, $table:ident, $expr:expr, $err:expr) => {
+    ($self:expr, foreign, $table:ident, $data:ident, $expr:expr, $err:expr) => {
         if $self.$table.get(&$expr).is_none() {
             return Err($err);
         }
     };
-    ($self:expr, unique, $table:ident, $expr:expr, $err:expr) => {
+    ($self:expr, unique, $table:ident, $data:ident, $expr:expr, $err:expr) => {
         if $self.$table.get(&$expr).is_some() {
             return Err($err);
         }
     };
-    ($self:expr, primary, $table:ident, $expr:expr, $err:expr) => {
+    ($self:expr, primary, $table:ident, $data:ident, $expr:expr, $err:expr) => {
         if $self.$table.get(&$expr).is_some() {
             return Err($err);
         }
     };
-    ($self:expr, reverse, $table:ident, $expr:expr, $err:expr) => {};
-    ($self:expr, index, $table:ident, $expr:expr, $err:expr) => {};
+    ($self:expr, constraint, $table:ident, $data:ident, $expr:expr, $err:expr) => {
+        if let Err(error) = $self.$table($data) {
+            return Err(error);
+        }
+    };
+    ($self:expr, $other:ident, $table:ident, $data:ident, $expr:expr, $err:expr) => {};
 }
 
 #[doc(hidden)]
@@ -120,7 +124,7 @@ macro_rules! table_insert_checks {
     ($table:ident: $type:ty, $errty:ty, $($itype:ident $name:ident $prop:tt => $err:expr),*) => {
         $crate::paste! {
             fn [<$table _insert_check>](&mut self, data: &$type) -> Result<(), $errty> {
-                $($crate::table_insert_check!(self, $itype, $name, $crate::table_prop!(data, $prop), $err);)*
+                $($crate::table_insert_check!(self, $itype, $name, data, $crate::table_prop!(data, $prop), $err);)*
                 Ok(())
             }
         }
@@ -173,6 +177,7 @@ macro_rules! table_prop {
         ($($crate::table_prop!(@inner, $data, $prop)),*)
     };
     (@inner, $data:expr, $prop:ident) => { $data.$prop.clone() };
+    ($data:expr, $prop:tt) => { $prop };
 }
 
 #[doc(hidden)]
@@ -273,17 +278,20 @@ macro_rules! table_update_indices {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! table_update_check {
-    ($self:expr, $pk:expr, unique, $name:ident, $old:expr, $new:expr, $err:expr) => {
+    ($self:expr, $pk:expr, unique, $name:ident, $data:ident, $old:expr, $new:expr, $err:expr) => {
         if $old != $new {
-            $crate::table_insert_check!($self, unique, $name, $new, $err);
+            $crate::table_insert_check!($self, unique, $name, $data, $new, $err);
         }
     };
-    ($self:expr, $pk:expr, foreign, $name:ident, $old:expr, $new:expr, $err:expr) => {
+    ($self:expr, $pk:expr, foreign, $name:ident, $data:ident, $old:expr, $new:expr, $err:expr) => {
         if $old != $new {
-            $crate::table_insert_check!($self, foreign, $name, $new, $err);
+            $crate::table_insert_check!($self, foreign, $name, $data, $new, $err);
         }
     };
-    ($self:expr, $pk:expr, $other:ident, $name:ident, $old:expr, $new:expr, $err:expr) => {};
+    ($self:expr, $pk:expr, constraint, $name:ident, $data:ident, $old:expr, $new:expr, $err:expr) => {
+        $crate::table_insert_check!($self, constraint, $name, $data, $new, $err);
+    };
+    ($self:expr, $pk:expr, $other:ident, $name:ident, $data:ident, $old:expr, $new:expr, $err:expr) => {};
 }
 
 #[doc(hidden)]
@@ -292,7 +300,7 @@ macro_rules! table_update_checks {
     ($table:ident: $type:ty, $pk:ident, $errty:ty, $($itype:ident $name:ident $prop:tt => $err:expr),*) => {
         $crate::paste! {
             fn [<$table _update_check>](&mut self, old: &$type, new: &$type) -> Result<(), $errty> {
-                $($crate::table_update_check!(self, old.$pk, $itype, $name, $crate::table_prop!(old, $prop), $crate::table_prop!(new, $prop), $err);)*
+                $($crate::table_update_check!(self, old.$pk, $itype, $name, new, $crate::table_prop!(old, $prop), $crate::table_prop!(new, $prop), $err);)*
                 Ok(())
             }
         }
