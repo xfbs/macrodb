@@ -10,20 +10,22 @@ There is no support for transactions, concurrency (aside from the usual Rust sem
 
 The speed of the generated database depends on the data type that you select (BTreeMap or HashMap) and on the number of indices. To get a rough estimate of the speed of the in-memory database, this repository contains benchmarks that compare this crate (using various storage data types) against the popular SQLite database running in-memory. The tests operate on a table with two regular indices and one unique index.
 
-Running the benchmarks on a MacBook Air M2, using one million (1,000,000) rows and randomized inputs (not sequential) for every benchmark, this is the performance. Higher is better.
+Running the benchmarks on a MacBook Air M2, using one million (1,000,000) rows and randomized inputs (not sequential) for every benchmark, this is the performance. All values are in Kelem/s (thousand rows per second). Higher is better.
 
-| Data types | Insert | Update | Delete | Clone |
+| Data types | Insert (Kelem/s) | Update (Kelem/s) | Delete (Kelem/s) | Clone (Kelem/s) |
 | --- | --: | --: | --: | --: |
-| `std::{BTreeMap, BTreeSet}` | 586 | 200 | 312 | 3,933 |
-| `std::{HashMap, HashSet}` | 1,188 | 614 | 605 | 1,279 |
-| `btree_slab::{BTreeMap, BTreeSet}` | 372 | 121 | 216 | 1,821 |
-| `im::{OrdMap, OrdSet}` | 344 | 138 | 248 | +inf |
-| `im::{HashMap, HashSet}` | 826 | 347 | 442 | +inf |
 | `hashbrown::{HashMap, HashSet}` | 2,273 | 754 | 790 | 1,286 |
+| `std::{HashMap, HashSet}` | 1,188 | 614 | 605 | 1,279 |
+| `std::{BTreeMap, BTreeSet}` | 586 | 200 | 312 | 3,933 |
+| `im::{HashMap, HashSet}` | 826 | 347 | 442 | +inf |
+| `im::{OrdMap, OrdSet}` | 344 | 138 | 248 | +inf |
 | `avl::{AvlTreeMap, AvlTreeSet}` | 532 | 162 | 238 | 1,952 |
-| `sqlite` | 388 | 138 | 309 | n/a |
+| `btree_slab::{BTreeMap, BTreeSet}` | 372 | 121 | 216 | 1,821 |
+| SQLite | 388 | 138 | 309 | n/a |
 
 This benchmark can be recreated by setting the insertion, update and deletion counts in `benches/single_table.rs` to one million and running `cargo bench`.
+
+Notably, the data types from the `im` crate are copy-on-write and can be cloned cheaply. This is why the clone time is indicated as `+inf`. 
 
 ## Example
 
