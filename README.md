@@ -15,7 +15,7 @@ Running the benchmarks on a MacBook Air M2, using one million (1,000,000) rows a
 | Data types | Insert | Update | Delete | Clone |
 | --- | --: | --: | --: | --: |
 | `std::{BTreeMap, BTreeSet}` | 586 | 200 | 312 | 3,933 |
-| `std::{HashMap, HashSet}` | | 1,188 | 614 | 605 | 1,279 |
+| `std::{HashMap, HashSet}` | 1,188 | 614 | 605 | 1,279 |
 | `btree_slab::{BTreeMap, BTreeSet}` | 372 | 121 | 216 | 1,821 |
 | `im::{OrdMap, OrdSet}` | 344 | 138 | 248 | +inf |
 | `im::{HashMap, HashSet}` | 826 | 347 | 442 | +inf |
