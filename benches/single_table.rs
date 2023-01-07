@@ -212,10 +212,10 @@ fn generate_users(limit: u64) -> Vec<User> {
 macro_rules! table_benchmark {
     ($c:expr, $name:expr, $database:ty, $operations:expr) => {
         let mut group = $c.benchmark_group($name);
+        for ops in $operations.into_iter() {
+            group.throughput(Throughput::Elements(ops));
 
-        for insertions in $operations.into_iter() {
-            group.throughput(Throughput::Elements(insertions));
-            group.bench_with_input(format!("insert-{insertions}"), &insertions, |b, elems| {
+            group.bench_with_input(format!("insert-{ops}"), &ops, |b, elems| {
                 b.iter_batched(
                     || generate_users(*elems),
                     |data| {
@@ -228,32 +228,24 @@ macro_rules! table_benchmark {
                     BatchSize::SmallInput,
                 )
             });
-        }
 
-        for insertions in $operations.into_iter() {
-            group.throughput(Throughput::Elements(insertions));
-            group.bench_with_input(
-                format!("random-insert-{insertions}"),
-                &insertions,
-                |b, elems| {
-                    b.iter_batched(
-                        || generate_users_random(*elems),
-                        |data| {
-                            let mut database = <$database>::default();
-                            for user in data.into_iter() {
-                                database.users_insert(user).unwrap();
-                            }
-                            black_box(database)
-                        },
-                        BatchSize::SmallInput,
-                    )
-                },
-            );
-        }
+            group.throughput(Throughput::Elements(ops));
+            group.bench_with_input(format!("random-insert-{ops}"), &ops, |b, elems| {
+                b.iter_batched(
+                    || generate_users_random(*elems),
+                    |data| {
+                        let mut database = <$database>::default();
+                        for user in data.into_iter() {
+                            database.users_insert(user).unwrap();
+                        }
+                        black_box(database)
+                    },
+                    BatchSize::SmallInput,
+                )
+            });
 
-        for updates in $operations.into_iter() {
-            group.throughput(Throughput::Elements(updates));
-            group.bench_with_input(format!("update-{updates}"), &updates, |b, elems| {
+            group.throughput(Throughput::Elements(ops));
+            group.bench_with_input(format!("update-{ops}"), &ops, |b, elems| {
                 b.iter_batched(
                     || {
                         let users = generate_users(*elems);
@@ -276,11 +268,9 @@ macro_rules! table_benchmark {
                     BatchSize::SmallInput,
                 )
             });
-        }
 
-        for updates in $operations.into_iter() {
-            group.throughput(Throughput::Elements(updates));
-            group.bench_with_input(format!("random-update-{updates}"), &updates, |b, elems| {
+            group.throughput(Throughput::Elements(ops));
+            group.bench_with_input(format!("random-update-{ops}"), &ops, |b, elems| {
                 b.iter_batched(
                     || {
                         let users = generate_users(*elems);
@@ -304,11 +294,9 @@ macro_rules! table_benchmark {
                     BatchSize::SmallInput,
                 )
             });
-        }
 
-        for deletions in $operations.into_iter() {
-            group.throughput(Throughput::Elements(deletions));
-            group.bench_with_input(format!("delete-{deletions}"), &deletions, |b, elems| {
+            group.throughput(Throughput::Elements(ops));
+            group.bench_with_input(format!("delete-{ops}"), &ops, |b, elems| {
                 b.iter_batched(
                     || {
                         let users = generate_users(*elems);
