@@ -1,4 +1,4 @@
-use crate::table;
+use macrodb::table;
 use std::collections::{BTreeMap as Map, BTreeSet as Set};
 
 type UserId = u64;
@@ -43,9 +43,8 @@ impl Database {
 #[test]
 fn can_insert_user() {
     let mut database = Database::default();
-    let id = database.users_next_id();
     let user = User {
-        id,
+        id: database.users_next_id(),
         first: "John".into(),
         last: "Doe".into(),
         age: 21,
@@ -53,18 +52,22 @@ fn can_insert_user() {
         country: "United States".into(),
     };
     database.users_insert(user.clone()).unwrap();
-    assert_eq!(database.users.get(&id), Some(&user));
-    assert!(database.users_by_age.get(&user.age).unwrap().contains(&id));
+    assert_eq!(database.users.get(&user.id), Some(&user));
+    assert!(database
+        .users_by_age
+        .get(&user.age)
+        .unwrap()
+        .contains(&user.id));
     assert!(database
         .users_by_location
         .get(&(user.city.clone(), user.country.clone()))
         .unwrap()
-        .contains(&id));
+        .contains(&user.id));
     assert_eq!(
         database
             .user_by_name
             .get(&(user.first.clone(), user.last.clone())),
-        Some(&id)
+        Some(&user.id)
     );
 }
 
@@ -90,4 +93,64 @@ fn cannot_insert_user_existing_name() {
         country: "United States".into(),
     });
     assert_eq!(result, Err(Error::UserNameExists));
+}
+
+#[test]
+fn can_update_user() {
+    let mut database = Database::default();
+    let id = database.users_next_id();
+    let mut user = User {
+        id,
+        first: "John".into(),
+        last: "Doe".into(),
+        age: 21,
+        city: "Atlantic City".into(),
+        country: "United States".into(),
+    };
+    database.users_insert(user.clone()).unwrap();
+    user.first = "Jack".into();
+    user.last = "Campbell".into();
+    user.city = "Neverland".into();
+    user.country = "Mexico".into();
+    database.users_update(user.clone()).unwrap();
+    assert_eq!(database.users.get(&id), Some(&user));
+    assert!(database.users_by_age.get(&user.age).unwrap().contains(&id));
+    assert!(database
+        .users_by_location
+        .get(&(user.city.clone(), user.country.clone()))
+        .unwrap()
+        .contains(&id));
+    assert_eq!(
+        database
+            .user_by_name
+            .get(&(user.first.clone(), user.last.clone())),
+        Some(&id)
+    );
+}
+
+#[test]
+fn can_delete_user() {
+    let mut database = Database::default();
+    let user = User {
+        id: database.users_next_id(),
+        first: "John".into(),
+        last: "Doe".into(),
+        age: 21,
+        city: "Atlantic City".into(),
+        country: "United States".into(),
+    };
+    database.users_insert(user.clone()).unwrap();
+    database.users_delete(user.id).unwrap();
+    assert_eq!(database.users.get(&user.id), None);
+    assert!(database.users_by_age.get(&user.age).is_none());
+    assert!(database
+        .users_by_location
+        .get(&(user.city.clone(), user.country.clone()))
+        .is_none());
+    assert_eq!(
+        database
+            .user_by_name
+            .get(&(user.first.clone(), user.last.clone())),
+        None
+    );
 }

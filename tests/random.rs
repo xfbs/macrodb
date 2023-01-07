@@ -1,7 +1,7 @@
-use crate::table;
 use avl::{AvlTreeMap, AvlTreeSet};
 use hashbrown::{HashMap as HashMapBrown, HashSet as HashSetBrown};
 use im::{HashMap as HashMapIm, OrdMap};
+use macrodb::table;
 use rand::{thread_rng, Rng};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use strum::{EnumIter, IntoEnumIterator};

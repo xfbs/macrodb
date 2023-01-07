@@ -1,4 +1,4 @@
-use crate::table;
+use macrodb::table;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 /// Errors that can result from database operations.

@@ -61,9 +61,6 @@
 /// Re-expport of paste, which is used internally.
 pub use paste::paste;
 
-#[cfg(test)]
-mod tests;
-
 #[doc(hidden)]
 #[macro_export]
 macro_rules! table_next_id {
@@ -167,20 +164,10 @@ macro_rules! table_prop {
     ($data:expr, $prop:ident) => {
         $data.$prop
     };
-    ($data:expr, ($a:ident, $b:ident)) => {
-        ($data.$a.clone(), $data.$b.clone())
+    ($data:expr, ($($prop:ident),*)) => {
+        ($($crate::table_prop!(@inner, $data, $prop)),*)
     };
-    ($data:expr, ($a:ident, $b:ident, $c:ident)) => {
-        ($data.$a.clone(), $data.$b.clone(), $data.$c.clone())
-    };
-    ($data:expr, ($a:ident, $b:ident, $c:ident, $d:ident)) => {
-        (
-            $data.$a.clone(),
-            $data.$b.clone(),
-            $data.$c.clone(),
-            $data.$d.clone(),
-        )
-    };
+    (@inner, $data:expr, $prop:ident) => { $data.$prop.clone() };
 }
 
 #[doc(hidden)]
