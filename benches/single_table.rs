@@ -1,3 +1,4 @@
+use aatree::{AATreeMap, AATreeSet};
 use avl::{AvlTreeMap, AvlTreeSet};
 use btree_slab::{BTreeMap as BTreeSlabMap, BTreeSet as BTreeSlabSet};
 use criterion::*;
@@ -52,24 +53,28 @@ impl Default for User {
     }
 }
 
+macro_rules! table_impl {
+    ($type:ty) => {
+        impl $type {
+            table!(
+                users: User,
+                id: UserId,
+                missing Error => Error::UserNotFound,
+                primary users id => Error::UserIdExists,
+                unique user_by_email email => Error::UserEmailExists,
+                index users_by_age age => (),
+                index users_by_name name => ()
+            );
+        }
+    }
+}
+
 #[derive(Default, Clone)]
 struct BTreeDatabase {
     users: BTreeMap<UserId, User>,
     user_by_email: BTreeMap<String, UserId>,
     users_by_age: BTreeMap<u32, BTreeSet<UserId>>,
     users_by_name: BTreeMap<String, BTreeSet<UserId>>,
-}
-
-impl BTreeDatabase {
-    table!(
-        users: User,
-        id: UserId,
-        missing Error => Error::UserNotFound,
-        primary users id => Error::UserIdExists,
-        unique user_by_email email => Error::UserEmailExists,
-        index users_by_age age => (),
-        index users_by_name name => ()
-    );
 }
 
 #[derive(Default, Clone)]
@@ -80,36 +85,12 @@ struct BTreeSlabDatabase {
     users_by_name: BTreeSlabMap<String, BTreeSlabSet<UserId>>,
 }
 
-impl BTreeSlabDatabase {
-    table!(
-        users: User,
-        id: UserId,
-        missing Error => Error::UserNotFound,
-        primary users id => Error::UserIdExists,
-        unique user_by_email email => Error::UserEmailExists,
-        index users_by_age age => (),
-        index users_by_name name => ()
-    );
-}
-
 #[derive(Default, Clone)]
 struct OrdMapDatabase {
     users: OrdMap<UserId, User>,
     user_by_email: OrdMap<String, UserId>,
     users_by_age: OrdMap<u32, BTreeSet<UserId>>,
     users_by_name: OrdMap<String, BTreeSet<UserId>>,
-}
-
-impl OrdMapDatabase {
-    table!(
-        users: User,
-        id: UserId,
-        missing Error => Error::UserNotFound,
-        primary users id => Error::UserIdExists,
-        unique user_by_email email => Error::UserEmailExists,
-        index users_by_age age => (),
-        index users_by_name name => ()
-    );
 }
 
 #[derive(Default, Clone)]
@@ -120,36 +101,12 @@ struct HashDatabase {
     users_by_name: HashMap<String, HashSet<UserId>>,
 }
 
-impl HashDatabase {
-    table!(
-        users: User,
-        id: UserId,
-        missing Error => Error::UserNotFound,
-        primary users id => Error::UserIdExists,
-        unique user_by_email email => Error::UserEmailExists,
-        index users_by_age age => (),
-        index users_by_name name => ()
-    );
-}
-
 #[derive(Default, Clone)]
 struct HashImDatabase {
     users: HashMapIm<UserId, User>,
     user_by_email: HashMapIm<String, UserId>,
     users_by_age: HashMapIm<u32, HashSet<UserId>>,
     users_by_name: HashMapIm<String, HashSet<UserId>>,
-}
-
-impl HashImDatabase {
-    table!(
-        users: User,
-        id: UserId,
-        missing Error => Error::UserNotFound,
-        primary users id => Error::UserIdExists,
-        unique user_by_email email => Error::UserEmailExists,
-        index users_by_age age => (),
-        index users_by_name name => ()
-    );
 }
 
 #[derive(Default, Clone)]
@@ -160,18 +117,6 @@ struct HashBrownDatabase {
     users_by_name: HashMapBrown<String, HashSetBrown<UserId>>,
 }
 
-impl HashBrownDatabase {
-    table!(
-        users: User,
-        id: UserId,
-        missing Error => Error::UserNotFound,
-        primary users id => Error::UserIdExists,
-        unique user_by_email email => Error::UserEmailExists,
-        index users_by_age age => (),
-        index users_by_name name => ()
-    );
-}
-
 #[derive(Default, Clone)]
 struct AvlDatabase {
     users: AvlTreeMap<UserId, User>,
@@ -180,17 +125,22 @@ struct AvlDatabase {
     users_by_name: AvlTreeMap<String, AvlTreeSet<UserId>>,
 }
 
-impl AvlDatabase {
-    table!(
-        users: User,
-        id: UserId,
-        missing Error => Error::UserNotFound,
-        primary users id => Error::UserIdExists,
-        unique user_by_email email => Error::UserEmailExists,
-        index users_by_age age => (),
-        index users_by_name name => ()
-    );
+#[derive(Default, Clone)]
+struct AADatabase {
+    users: AATreeMap<UserId, User>,
+    user_by_email: AATreeMap<String, UserId>,
+    users_by_age: AATreeMap<u32, AATreeSet<UserId>>,
+    users_by_name: AATreeMap<String, AATreeSet<UserId>>,
 }
+
+table_impl!(BTreeDatabase);
+table_impl!(BTreeSlabDatabase);
+table_impl!(OrdMapDatabase);
+table_impl!(HashDatabase);
+table_impl!(HashImDatabase);
+table_impl!(HashBrownDatabase);
+table_impl!(AvlDatabase);
+table_impl!(AADatabase);
 
 fn generate_user(id: u64, num: u64) -> User {
     User {
@@ -620,6 +570,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     table_benchmark!(c, "im::hash", HashImDatabase, operations);
     table_benchmark!(c, "brown::hash", HashBrownDatabase, operations);
     table_benchmark!(c, "avl::tree", AvlDatabase, operations);
+    table_benchmark!(c, "aatree", AADatabase, operations);
 
     sqlite_benchmark!(c, "sqlite", operations);
 }

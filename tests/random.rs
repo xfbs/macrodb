@@ -1,3 +1,4 @@
+use aatree::{AATreeMap, AATreeSet};
 use avl::{AvlTreeMap, AvlTreeSet};
 use hashbrown::{HashMap as HashMapBrown, HashSet as HashSetBrown};
 use im::{HashMap as HashMapIm, OrdMap};
@@ -38,6 +39,33 @@ struct Group {
     privileged: bool,
 }
 
+macro_rules! table_impl {
+    ($type:ty) => {
+        impl $type {
+            table!(
+                users: User,
+                id: UserId,
+                missing Error => Error::UserNotFound,
+                primary users id => Error::UserIdExists,
+                unique user_by_email email => Error::UserEmailExists,
+                unique user_by_name name => Error::UserNameExists,
+                foreign groups group => Error::GroupNotFound,
+                index users_by_age age => (),
+                index users_by_group group => ()
+            );
+            table!(
+                groups: Group,
+                id: GroupId,
+                missing Error => Error::GroupNotFound,
+                primary groups id => Error::GroupIdExists,
+                unique group_by_name name => Error::GroupNameExists,
+                reverse users_by_group id => Error::GroupNotEmpty,
+                index groups_by_privileged privileged => ()
+            );
+        }
+    }
+}
+
 #[derive(Default)]
 struct StdDatabase {
     users: BTreeMap<UserId, User>,
@@ -49,30 +77,6 @@ struct StdDatabase {
     groups: HashMap<GroupId, Group>,
     group_by_name: HashMap<String, GroupId>,
     groups_by_privileged: HashMap<bool, HashSet<GroupId>>,
-}
-
-impl StdDatabase {
-    table!(
-        users: User,
-        id: UserId,
-        missing Error => Error::UserNotFound,
-        primary users id => Error::UserIdExists,
-        unique user_by_email email => Error::UserEmailExists,
-        unique user_by_name name => Error::UserNameExists,
-        foreign groups group => Error::GroupNotFound,
-        index users_by_age age => (),
-        index users_by_group group => ()
-    );
-    table!(
-        groups: Group,
-        id: GroupId,
-        missing Error => Error::GroupNotFound,
-        primary groups id => Error::GroupIdExists,
-        unique group_by_name name => Error::GroupNameExists,
-        reverse users_by_group id => Error::GroupNotEmpty,
-        index groups_by_privileged privileged => ()
-
-    );
 }
 
 #[derive(Default)]
@@ -88,30 +92,6 @@ struct ImDatabase {
     groups_by_privileged: HashMapIm<bool, HashSet<GroupId>>,
 }
 
-impl ImDatabase {
-    table!(
-        users: User,
-        id: UserId,
-        missing Error => Error::UserNotFound,
-        primary users id => Error::UserIdExists,
-        unique user_by_email email => Error::UserEmailExists,
-        unique user_by_name name => Error::UserNameExists,
-        foreign groups group => Error::GroupNotFound,
-        index users_by_age age => (),
-        index users_by_group group => ()
-    );
-    table!(
-        groups: Group,
-        id: GroupId,
-        missing Error => Error::GroupNotFound,
-        primary groups id => Error::GroupIdExists,
-        unique group_by_name name => Error::GroupNameExists,
-        reverse users_by_group id => Error::GroupNotEmpty,
-        index groups_by_privileged privileged => ()
-
-    );
-}
-
 #[derive(Default)]
 struct AvlDatabase {
     users: AvlTreeMap<UserId, User>,
@@ -123,30 +103,6 @@ struct AvlDatabase {
     groups: AvlTreeMap<GroupId, Group>,
     group_by_name: AvlTreeMap<String, GroupId>,
     groups_by_privileged: AvlTreeMap<bool, AvlTreeSet<GroupId>>,
-}
-
-impl AvlDatabase {
-    table!(
-        users: User,
-        id: UserId,
-        missing Error => Error::UserNotFound,
-        primary users id => Error::UserIdExists,
-        unique user_by_email email => Error::UserEmailExists,
-        unique user_by_name name => Error::UserNameExists,
-        foreign groups group => Error::GroupNotFound,
-        index users_by_age age => (),
-        index users_by_group group => ()
-    );
-    table!(
-        groups: Group,
-        id: GroupId,
-        missing Error => Error::GroupNotFound,
-        primary groups id => Error::GroupIdExists,
-        unique group_by_name name => Error::GroupNameExists,
-        reverse users_by_group id => Error::GroupNotEmpty,
-        index groups_by_privileged privileged => ()
-
-    );
 }
 
 #[derive(Default)]
@@ -162,29 +118,24 @@ struct HashBrownDatabase {
     groups_by_privileged: HashMapBrown<bool, HashSetBrown<GroupId>>,
 }
 
-impl HashBrownDatabase {
-    table!(
-        users: User,
-        id: UserId,
-        missing Error => Error::UserNotFound,
-        primary users id => Error::UserIdExists,
-        unique user_by_email email => Error::UserEmailExists,
-        unique user_by_name name => Error::UserNameExists,
-        foreign groups group => Error::GroupNotFound,
-        index users_by_age age => (),
-        index users_by_group group => ()
-    );
-    table!(
-        groups: Group,
-        id: GroupId,
-        missing Error => Error::GroupNotFound,
-        primary groups id => Error::GroupIdExists,
-        unique group_by_name name => Error::GroupNameExists,
-        reverse users_by_group id => Error::GroupNotEmpty,
-        index groups_by_privileged privileged => ()
+#[derive(Default)]
+struct AADatabase {
+    users: AATreeMap<UserId, User>,
+    user_by_email: AATreeMap<String, UserId>,
+    user_by_name: AATreeMap<String, UserId>,
+    users_by_age: AATreeMap<UserAge, AATreeSet<UserId>>,
+    users_by_group: AATreeMap<GroupId, AATreeSet<UserId>>,
 
-    );
+    groups: AATreeMap<GroupId, Group>,
+    group_by_name: AATreeMap<String, GroupId>,
+    groups_by_privileged: AATreeMap<bool, AATreeSet<GroupId>>,
 }
+
+table_impl!(AvlDatabase);
+table_impl!(HashBrownDatabase);
+table_impl!(AADatabase);
+table_impl!(ImDatabase);
+table_impl!(StdDatabase);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum UsersOperation {
@@ -481,6 +432,38 @@ fn hashbrown_database() {
 fn avl_database() {
     let mut rng = thread_rng();
     let mut database = AvlDatabase::default();
+    let mut errors: BTreeMap<Error, usize> = BTreeMap::new();
+    let mut successes = 0;
+
+    let batch_size = 100;
+    for _ in (0..100_00).step_by(batch_size) {
+        let operations: Vec<Operation> = (0..batch_size)
+            .map(|_| Operation::random(&mut rng))
+            .collect();
+        for operation in operations.into_iter() {
+            match apply!(database, operation) {
+                Ok(()) => {
+                    successes += 1;
+                }
+                Err(err) => {
+                    *errors.entry(err).or_default() += 1;
+                }
+            }
+        }
+
+        check!(database);
+    }
+
+    assert!(successes > 0);
+    for error in Error::iter() {
+        assert!(*errors.get(&error).unwrap() > 0);
+    }
+}
+
+#[test]
+fn aa_database() {
+    let mut rng = thread_rng();
+    let mut database = AADatabase::default();
     let mut errors: BTreeMap<Error, usize> = BTreeMap::new();
     let mut successes = 0;
 
