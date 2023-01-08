@@ -1,10 +1,10 @@
-# MacroDB
+# MacroDB [![Crate version]][crate] [![Docs badge]][docsrs]
 
-This is a crate that lets you automatically generate code for an in-memory relational database in Rust. It supports indexes, including unique indexes, as well as foreign keys. It can use [HashMap](https://doc.rust-lang.org/std/collections/hash_map/struct.HashMap.html) as well as [BTreeMap](https://doc.rust-lang.org/std/collections/struct.BTreeMap.html) for the indices.
+This is a crate that lets you automatically generate code for a type-safe in-memory relational database in Rust. It supports unique and regular indices, foreign key constraints, and generic (function) constraints. It is generic over the data types used to store the indices and records in, it can for example use [HashMap](https://doc.rust-lang.org/std/collections/hash_map/struct.HashMap.html) or [BTreeMap](https://doc.rust-lang.org/std/collections/struct.BTreeMap.html) or a large number of other data structures from other crates, see the benchmark section below.
 
-On a high level, the crate works by having you define a database struct that contains the tables and all of the indices, and then invoking the macro to generate appropriate insertion, update and deletion methods.
+On a high level, the crate works by having you define a database struct that contains the tables and indices, and then invoking the macro to generate appropriate insertion, update and deletion methods per table. The insertion, update and deletion methods work to ensure consistency of the database and update the indices.
 
-There is no support for transactions, concurrency (aside from the usual Rust semantics of having either multiple readers or a single writer) or persistence.
+There is no support for transactions or concurrency yet, aside from the usual Rust semantics of having either multiple readers or a single writer. It is possible to emulate transactions using the `im` crate, which offers copy-on-write immutable data structures, and a mutex. This allows for semantics similar to that of SQLite, with many concurrent read-only transactions but only a single write transaction.
 
 ## Benchmark
 
@@ -34,3 +34,9 @@ See `examples/` in this repository.
 ## License
 
 MIT, see [LICENSE.md]()
+
+[Docs badge]: https://img.shields.io/docsrs/macrodb
+[docsrs]: https://docs.rs/macrodb/
+[Crate version]: https://img.shields.io/crates/v/macrodb
+[crate]: https://crates.io/crates/macrodb
+
