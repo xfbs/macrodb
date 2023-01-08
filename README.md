@@ -13,15 +13,16 @@ The speed of the generated database depends on the data type that you select (BT
 Running the benchmarks on a MacBook Air M2, using one million (1,000,000) rows and randomized inputs (not sequential) for every benchmark, this is the performance. All values are in Kelem/s (thousand rows per second). Higher is better.
 
 | Data types | Insert (Kelem/s) | Update (Kelem/s) | Delete (Kelem/s) | Clone (Kelem/s) |
-| --- | --: | --: | --: | --: |
-| `hashbrown::{HashMap, HashSet}` | 2,273 | 754 | 790 | 1,286 |
-| `std::{HashMap, HashSet}` | 1,188 | 614 | 605 | 1,279 |
-| `std::{BTreeMap, BTreeSet}` | 586 | 200 | 312 | 3,933 |
-| `im::{HashMap, HashSet}` | 826 | 347 | 442 | +inf |
-| `im::{OrdMap, OrdSet}` | 344 | 138 | 248 | +inf |
-| `avl::{AvlTreeMap, AvlTreeSet}` | 532 | 162 | 238 | 1,952 |
-| `btree_slab::{BTreeMap, BTreeSet}` | 372 | 121 | 216 | 1,821 |
-| SQLite | 388 | 138 | 309 | n/a |
+| :-- | --: | --: | --: | --: |
+| `hashbrown::{HashMap, HashSet}`    | 2,253 | 746 | 786 | 1,131 |
+| `std::{HashMap, HashSet}`          | 1,317 | 639 | 648 | 1,239 |
+| `std::{BTreeMap, BTreeSet}`        |   596 | 202 | 313 | 4,163 |
+| `im::{HashMap, HashSet}`           |   832 | 342 | 427 |  +inf |
+| `im::{OrdMap, OrdSet}`             |   364 | 142 | 251 |  +inf |
+| `avl::{AvlTreeMap, AvlTreeSet}`    |   515 | 160 | 231 | 2,008 |
+| `aatree::{AATreeMap, AATreeSet}`   |   333 | 105 | 157 | 1,129 |
+| `btree_slab::{BTreeMap, BTreeSet}` |   389 | 123 | 217 | 1,898 |
+| SQLite                             |   388 | 135 | 302 | `n/a` |
 
 This benchmark can be recreated by setting the insertion, update and deletion counts in `benches/single_table.rs` to one million and running `cargo bench`.
 
