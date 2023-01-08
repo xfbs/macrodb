@@ -150,17 +150,22 @@ macro_rules! table_delete {
 #[macro_export]
 macro_rules! table_insert_index {
     ($self:expr, $pk:expr, unique, $name:ident, $prop:expr) => {
-        if $self.$name.insert($prop.clone(), $pk.clone()).is_some() {
-            panic!(concat!(stringify!($name), " index entry already existsted"));
+        let _result = $self.$name.insert($prop.clone(), $pk.clone());
+
+        #[cfg(debug_assertions)]
+        if _result.is_some() {
+            panic!(concat!(stringify!($name), " index entry already existed"));
         }
     };
     ($self:expr, $pk:expr, index, $name:ident, $prop:expr) => {
-        if !$self
+        let _exists = $self
             .$name
             .entry($prop.clone())
             .or_default()
-            .insert($pk.clone())
-        {
+            .insert($pk.clone());
+
+        #[cfg(debug_assertions)]
+        if !_exists {
             panic!(concat!(stringify!($name), " index already had new user"));
         }
     };
@@ -197,7 +202,9 @@ macro_rules! table_insert_indices {
 macro_rules! table_delete_index {
     ($self:expr, $pk:expr, unique, $name:ident, $prop:expr) => {
         match $self.$name.remove(&$prop) {
+            #[cfg(debug_assertions)]
             None => panic!(concat!(stringify!($name), " unique index missing item")),
+            #[cfg(debug_assertions)]
             Some(value) if value != $pk => {
                 panic!(concat!(stringify!($name), " unique index had wrong key"))
             }
@@ -206,6 +213,7 @@ macro_rules! table_delete_index {
     };
     ($self:expr, $pk:expr, reverse, $name:ident, $prop:expr) => {
         match $self.$name.remove(&$pk) {
+            #[cfg(debug_assertions)]
             Some(value) if !value.is_empty() => {
                 panic!(concat!(stringify!($name, " reverse index not empty")))
             }
@@ -217,7 +225,9 @@ macro_rules! table_delete_index {
             .$name
             .get_mut(&$prop)
             .expect(concat!(stringify!($name), " index missing"));
-        if !values.remove(&$pk) {
+        let _result = values.remove(&$pk);
+        #[cfg(debug_assertions)]
+        if !_result {
             panic!(concat!(stringify!($name), " index already had new user"));
         }
         if values.is_empty() {
@@ -313,6 +323,7 @@ macro_rules! table_delete_check {
     ($self:expr, $pk:expr, reverse, $name:ident, $prop:expr, $err:expr) => {
         match $self.$name.get(&$pk) {
             None => {}
+            #[cfg(debug_assertions)]
             Some(items) if items.is_empty() => {
                 panic!(concat!(stringify!($name), " has empty index"))
             }
