@@ -164,6 +164,17 @@ macro_rules! table_insert_index {
             panic!(concat!(stringify!($name), " index already had new user"));
         }
     };
+    ($self:expr, $pk:expr, index_im, $name:ident, $prop:expr) => {
+        if !$self
+            .$name
+            .entry($prop.clone())
+            .or_default()
+            .insert($pk.clone())
+            .is_none()
+        {
+            panic!(concat!(stringify!($name), " index already had new user"));
+        }
+    };
     ($self:expr, $pk:expr, $other:ident, $name:ident, $prop:expr) => {};
 }
 
@@ -218,6 +229,18 @@ macro_rules! table_delete_index {
             .get_mut(&$prop)
             .expect(concat!(stringify!($name), " index missing"));
         if !values.remove(&$pk) {
+            panic!(concat!(stringify!($name), " index already had new user"));
+        }
+        if values.is_empty() {
+            $self.$name.remove(&$prop);
+        }
+    };
+    ($self:expr, $pk:expr, index_im, $name:ident, $prop:expr) => {
+        let values = $self
+            .$name
+            .get_mut(&$prop)
+            .expect(concat!(stringify!($name), " index missing"));
+        if values.remove(&$pk).is_none() {
             panic!(concat!(stringify!($name), " index already had new user"));
         }
         if values.is_empty() {

@@ -3,7 +3,7 @@ use avl::{AvlTreeMap, AvlTreeSet};
 use btree_slab::{BTreeMap as BTreeSlabMap, BTreeSet as BTreeSlabSet};
 use criterion::*;
 use hashbrown::{HashMap as HashMapBrown, HashSet as HashSetBrown};
-use im::{HashMap as HashMapIm, OrdMap};
+use im::{HashMap as HashMapIm, HashSet as HashSetIm, OrdMap, OrdSet};
 use macrodb::table;
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_chacha::ChaCha20Rng;
@@ -69,6 +69,22 @@ macro_rules! table_impl {
     }
 }
 
+macro_rules! table_impl_im {
+    ($type:ty) => {
+        impl $type {
+            table!(
+                users: User,
+                id: UserId,
+                missing Error => Error::UserNotFound,
+                primary users id => Error::UserIdExists,
+                unique user_by_email email => Error::UserEmailExists,
+                index_im users_by_age age => (),
+                index_im users_by_name name => ()
+            );
+        }
+    }
+}
+
 #[derive(Default, Clone)]
 struct BTreeDatabase {
     users: BTreeMap<UserId, User>,
@@ -89,8 +105,8 @@ struct BTreeSlabDatabase {
 struct OrdMapDatabase {
     users: OrdMap<UserId, User>,
     user_by_email: OrdMap<String, UserId>,
-    users_by_age: OrdMap<u32, BTreeSet<UserId>>,
-    users_by_name: OrdMap<String, BTreeSet<UserId>>,
+    users_by_age: OrdMap<u32, OrdSet<UserId>>,
+    users_by_name: OrdMap<String, OrdSet<UserId>>,
 }
 
 #[derive(Default, Clone)]
@@ -105,8 +121,8 @@ struct HashDatabase {
 struct HashImDatabase {
     users: HashMapIm<UserId, User>,
     user_by_email: HashMapIm<String, UserId>,
-    users_by_age: HashMapIm<u32, HashSet<UserId>>,
-    users_by_name: HashMapIm<String, HashSet<UserId>>,
+    users_by_age: HashMapIm<u32, HashSetIm<UserId>>,
+    users_by_name: HashMapIm<String, HashSetIm<UserId>>,
 }
 
 #[derive(Default, Clone)]
@@ -135,9 +151,9 @@ struct AADatabase {
 
 table_impl!(BTreeDatabase);
 table_impl!(BTreeSlabDatabase);
-table_impl!(OrdMapDatabase);
+table_impl_im!(OrdMapDatabase);
 table_impl!(HashDatabase);
-table_impl!(HashImDatabase);
+table_impl_im!(HashImDatabase);
 table_impl!(HashBrownDatabase);
 table_impl!(AvlDatabase);
 table_impl!(AADatabase);
