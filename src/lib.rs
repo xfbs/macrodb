@@ -242,25 +242,14 @@ macro_rules! table_delete_indices {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! table_update_index {
-    ($self:expr, $pk:expr, index, $name:ident, $old:expr, $new:expr) => {
+    ($self:expr, $pk:expr, primary, $name:ident, $old:expr, $new:expr) => {};
+    ($self:expr, $pk:expr, constraint, $name:ident, $old:expr, $new:expr) => {};
+    ($self:expr, $pk:expr, $kind:ident, $name:ident, $old:expr, $new:expr) => {
         if $old != $new {
-            $crate::table_delete_index!($self, $pk, index, $name, $old);
-            $crate::table_insert_index!($self, $pk, index, $name, $new);
+            $crate::table_delete_index!($self, $pk, $kind, $name, $old);
+            $crate::table_insert_index!($self, $pk, $kind, $name, $new);
         }
     };
-    ($self:expr, $pk:expr, unique, $name:ident, $old:expr, $new:expr) => {
-        if $old != $new {
-            $crate::table_delete_index!($self, $pk, unique, $name, $old);
-            $crate::table_insert_index!($self, $pk, unique, $name, $new);
-        }
-    };
-    ($self:expr, $pk:expr, reverse, $name:ident, $old:expr, $new:expr) => {
-        if $old != $new {
-            $crate::table_delete_index!($self, $pk, reverse, $name, $old);
-            $crate::table_insert_index!($self, $pk, reverse, $name, $new);
-        }
-    };
-    ($self:expr, $pk:expr, $other:ident, $name:ident, $old:expr, $new:expr) => {};
 }
 
 #[doc(hidden)]
